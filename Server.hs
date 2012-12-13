@@ -7,7 +7,7 @@ import Control.Monad (forever, void)
 import qualified Data.ByteString.Char8 as B8
 import Network
 import System.Directory (setCurrentDirectory)
-import Commons
+import Common
 
 -- dummy
 data Config = Config
