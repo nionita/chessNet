@@ -1,12 +1,13 @@
-module Server (
+module Main (
         main
     ) where
 
 import Control.Concurrent
-import Control.Monad (forever, void)
+import Control.Monad (forever, void, when)
 import qualified Data.ByteString.Char8 as B8
 import Network
 import System.Directory (setCurrentDirectory)
+import System.IO
 import Common
 
 -- dummy
@@ -31,6 +32,10 @@ readConfig = return Config
 isClientOk :: Config -> String -> Bool
 isClientOk _ _ = True
 
+-- dummy
+isProgramOk :: Config -> String -> Bool
+isProgramOk _ _ = True
+
 handleClient :: Config -> Handle -> IO ()
 handleClient config h = do
     cdl <- B8.hGetLine h
@@ -40,6 +45,7 @@ handleClient config h = do
         stl <- B8.hGetLine h
         when (start `B8.isPrefixOf` stl) $ do
             let cmd8 = B8.drop 6 stl
-                prg  = unpack . fst . B8.span (/= ' ') $ cmd8
-            when (isProgramOk config prg)
-               
+                prg  = B8.unpack . fst . B8.span (/= ' ') $ cmd8
+            when (isProgramOk config prg) $ do
+                ioToNet True
+                return ()
