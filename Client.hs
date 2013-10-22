@@ -3,6 +3,8 @@ module Main (
     ) where
 
 import Control.Applicative ((<$>))
+import Control.Concurrent
+import Control.Concurrent.Chan
 import Control.Exception.Base (bracket)
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Map as M
@@ -44,6 +46,12 @@ runClient (host, dir, cmd) = bracket (connectTo host chessNetPort)
 
 startClient :: String -> String -> Handle -> IO ()
 startClient dir cmd h = do
+    hSetBuffering h LineBuffering
     doCd h $ B8.pack dir
     doStart h $ B8.pack cmd
-    ioToNet False
+    ch  <- newChan
+    tpn <- forkThenSignal ch (stdin `fromHdlToHdl` h)
+    tnp <- forkThenSignal ch (h     `fromHdlToHdl` stdout)
+    _ <- readChan ch
+    killThread tpn	-- one of them will error out (already terminated) - what then?
+    killThread tnp

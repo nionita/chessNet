@@ -3,15 +3,23 @@ module Main (
     ) where
 
 import Control.Concurrent
-import Control.Monad (forever, void, when)
+import Control.Concurrent.Chan
+import Control.Exception
+import Control.Monad
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
 import qualified Data.ByteString.Char8 as B8
 import Network
-import System.Directory (setCurrentDirectory)
+import System.Directory
 import System.IO
+import System.Process
+
 import Common
 
 -- dummy
 data Config = Config
+
+type CtxIO a = ReaderT Config IO a
 
 -- TODO: we should count the number of engines running
 -- and refuse new connections when reaching a define limit
@@ -22,30 +30,55 @@ main = do
     withSocketsDo $ forever $ do
         socket <- listenOn chessNetPort
         (handle, client, _) <- accept socket
-        when (isClientOk config client) $ void $ forkIO $ handleClient config handle
+        forkFinally (
+                checkClient config client $
+                    runReaderT (handleClient handle) Config
+            )
+            (\_ -> hClose handle)
 
 -- dummy
 readConfig :: IO Config
 readConfig = return Config
 
 -- dummy
-isClientOk :: Config -> String -> Bool
-isClientOk _ _ = True
+-- TODO: check client permission, log the request etc
+checkClient :: Config -> String -> IO () -> IO ()
+checkClient _ _ act = act
 
 -- dummy
-isProgramOk :: Config -> String -> Bool
-isProgramOk _ _ = True
+-- TODO: check if program is allowed to be start, log etc
+checkProg :: String -> CtxIO () -> CtxIO ()
+checkProg _ act = act
 
-handleClient :: Config -> Handle -> IO ()
-handleClient config h = do
-    cdl <- B8.hGetLine h
-    when (cd `B8.isPrefixOf` cdl) $ do
-        let cwdir = B8.unpack $ B8.drop 3 cdl
-        setCurrentDirectory cwdir
-        stl <- B8.hGetLine h
-        when (start `B8.isPrefixOf` stl) $ do
-            let cmd8 = B8.drop 6 stl
-                prg  = B8.unpack . fst . B8.span (/= ' ') $ cmd8
-            when (isProgramOk config prg) $ do
-                ioToNet True
-                return ()
+-- TODO: write log when not what expected
+expectCmd :: Handle -> B8.ByteString -> (B8.ByteString -> CtxIO ()) -> CtxIO ()
+expectCmd h bcmd act = do
+    bline <- liftIO $ B8.hGetLine h
+    if bcmd `B8.isPrefixOf` bline
+       then do	-- got what expected: take line rest and run the action with it
+           let rest = B8.drop (B8.length bcmd) bline
+           act rest
+       else return ()	-- did not get what expected: should write log and exit
+
+handleClient :: Handle -> CtxIO ()
+handleClient hnet = do
+    liftIO $ hSetBuffering hnet LineBuffering
+    expectCmd hnet cd $ \cdrest -> do
+        let cwdir = B8.unpack cdrest
+        expectCmd hnet start $ \strest -> do
+            case map B8.unpack $ B8.words strest of
+                []         -> error "After start: what?"	-- TODO: make proper with logging
+                (prg:args) -> checkProg prg $ liftIO
+                                  $ bracket (openFile "stdError.txt" WriteMode) hClose	-- file name?
+                                  $ \herl -> do
+                                      (hinp, hout, herr, hprc) <- runInteractiveProcess prg args (Just cwdir) Nothing
+                                      liftIO $ do
+                                          ch  <- newChan
+                                          tnp <- forkThenSignal ch (hnet `fromHdlToHdl` hinp)
+                                          tpn <- forkThenSignal ch (hout `fromHdlToHdl` hnet)
+                                          ter <- forkThenSignal ch (herr `fromHdlToHdl` herl)
+                                          _ <- readChan ch
+                                          -- one will be already done, so error - what is then?
+                                          killThread tnp
+                                          killThread tnp
+                                          killThread ter

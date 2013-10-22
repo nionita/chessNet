@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                chessNet
-version:             0.1.0.0
+version:             0.1.0
 synopsis:            Connects a chess GUI with remote engines over TCP/IP
 -- description:         
 license:             LGPL-3
@@ -23,5 +23,5 @@ executable chessNetClient
 executable chessNetServer
   main-is:             Server.hs
   -- other-modules:       
-  build-depends:       base, bytestring, network, directory
+  build-depends:       base, bytestring, network, directory, process, transformers
   ghc-options:         -O2
