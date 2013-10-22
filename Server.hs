@@ -28,18 +28,19 @@ type CtxIO a = ReaderT Config IO a
 -- this into account
 main = do
     config <- readConfig
-    withSocketsDo $ forever $ do
+    withSocketsDo $ do
         socket <- listenOn chessNetPort
-        (handle, client, _) <- accept socket
-        forkFinally (do
-                checkClient config client $
-                    runReaderT (handleClient handle) Config
-                putStrLn $ "Client " ++ client ++ " will be closed"
-                hClose handle
-            )
-            (\_ -> do
-                putStrLn $ "Client " ++ client ++ " will be closed in Finally"
-                hClose handle)
+        forever $ do
+            (handle, client, _) <- accept socket
+            forkFinally (do
+                    checkClient config client $
+                        runReaderT (handleClient handle) Config
+                    putStrLn $ "Client " ++ client ++ " will be closed"
+                    hClose handle
+                )
+                (\_ -> do
+                    putStrLn $ "Client " ++ client ++ " will be closed in Finally"
+                    hClose handle)
 
 -- dummy
 readConfig :: IO Config
