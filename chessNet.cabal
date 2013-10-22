@@ -17,7 +17,7 @@ cabal-version:       >=1.8
 executable chessNetClient
   main-is:             Client.hs
   -- other-modules:       
-  build-depends:       base, bytestring, network, directory, containers
+  build-depends:       base, bytestring, network, filepath, containers
   ghc-options:         -O2
 
 executable chessNetServer

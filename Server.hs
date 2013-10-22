@@ -9,6 +9,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import qualified Data.ByteString.Char8 as B8
+import Data.List
 import Network
 import System.Directory
 import System.IO
@@ -40,10 +41,15 @@ main = do
 readConfig :: IO Config
 readConfig = return Config
 
--- dummy
 -- TODO: check client permission, log the request etc
 checkClient :: Config -> String -> IO () -> IO ()
-checkClient _ _ act = act
+checkClient _ client act = do
+    putStrLn $ "Client " ++ client ++ " wants to connect"
+    if "192.168.1." `isPrefixOf` client
+       then do
+           putStrLn "Client accepted"
+           act
+       else putStrLn "Client refused"
 
 -- dummy
 -- TODO: check if program is allowed to be start, log etc
