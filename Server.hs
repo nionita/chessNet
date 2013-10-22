@@ -31,21 +31,27 @@ main = do
     withSocketsDo $ forever $ do
         socket <- listenOn chessNetPort
         (handle, client, _) <- accept socket
-        forkFinally (
+        forkFinally (do
                 checkClient config client $
                     runReaderT (handleClient handle) Config
+                putStrLn $ "Client " ++ client ++ " will be closed"
+                hClose handle
             )
-            (\_ -> hClose handle)
+            (\_ -> do
+                putStrLn $ "Client " ++ client ++ " will be closed in Finally"
+                hClose handle)
 
 -- dummy
 readConfig :: IO Config
 readConfig = return Config
 
+-- dummy
 -- TODO: check client permission, log the request etc
 checkClient :: Config -> String -> IO () -> IO ()
 checkClient _ client act = do
     putStrLn $ "Client " ++ client ++ " wants to connect"
     if "192.168.1." `isPrefixOf` client
+       || "sixpack." `isPrefixOf` client
        then do
            putStrLn "Client accepted"
            act
@@ -54,7 +60,13 @@ checkClient _ client act = do
 -- dummy
 -- TODO: check if program is allowed to be start, log etc
 checkProg :: String -> CtxIO () -> CtxIO ()
-checkProg _ act = act
+checkProg prog act = do
+    liftIO $ putStrLn $ "Prog " ++ prog ++ " was requested"
+    if "Barbarossa" `isPrefixOf` prog
+       then do
+           liftIO $ putStrLn "Program accepted"
+           act
+       else liftIO $ putStrLn "Program rejected"
 
 -- TODO: write log when not what expected
 expectCmd :: Handle -> B8.ByteString -> (B8.ByteString -> CtxIO ()) -> CtxIO ()
